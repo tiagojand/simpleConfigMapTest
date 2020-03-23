@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="        http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd        http://camel.apache.org/schema/spring       http://camel.apache.org/schema/spring/camel-spring.xsd">
+    <bean class="pt.cgi.CamelRoute" id="RouteStarter"/>
+    <bean
+        class="org.springframework.beans.factory.config.PropertyPlaceholderConfigurer" id="propertyConfigs">
+        <property name="location" value="classpath:application.properties"/>
+    </bean>
+    <!--     azure configurations  -->
+    <bean class="org.apache.qpid.jms.JmsConnectionFactory"
+        id="AzurejmsConnectionFactory" primary="true">
+        <property name="remoteURI" value="amqps://${AZURE_REMOTE_URI}"/>
+        <property name="username" value="${AZURE_USERNAME}"/>
+        <property name="password" value="${AZURE_PASSWORD}"/>
+    </bean>
+    <bean
+        class="org.springframework.jms.connection.CachingConnectionFactory" id="AzurejmsCachingConnectionFactory">
+        <property name="targetConnectionFactory" ref="AzurejmsConnectionFactory"/>
+    </bean>
+    <bean class="org.apache.camel.component.jms.JmsConfiguration" id="AzurejmsConfig">
+        <property name="connectionFactory" ref="AzurejmsCachingConnectionFactory"/>
+        <property name="cacheLevelName" value="${JMS_CACHE_LEVEL}"/>
+    </bean>
+    <bean class="org.apache.camel.component.amqp.AMQPComponent" id="amqp">
+        <property name="configuration" ref="AzurejmsConfig"/>
+    </bean>
+    <!-- AMQ configurations -->
+    <bean
+        class="org.apache.activemq.artemis.jms.client.ActiveMQJMSConnectionFactory" id="artemis-connection-factory">
+        <property name="brokerURL" value="${AMQ_URL}"/>
+        <property name="user" value="${AMQ_USERNAME}"/>
+        <property name="password" value="${AMQ_PASSWORD}"/>
+    </bean>
+    <bean class="org.messaginghub.pooled.jms.JmsPoolConnectionFactory" id="pooled-jms">
+        <property name="connectionFactory" ref="artemis-connection-factory"/>
+        <property name="maxConnections" value="${AMQ_MAX_CONNECTIONS}"/>
+        <property name="blockIfSessionPoolIsFull" value="${AMQ_BLOCK_IF_SESSION_POOL_IS_FULL}"/>
+        <property name="blockIfSessionPoolIsFullTimeout" value="${AMQ_BLOCK_IF_SESSION_POOL_IS_FULL_TIMEOUT}"/>
+        <property name="connectionIdleTimeout" value="${AMQ_IDLE_TIMEOUT}"/>
+        <property name="useAnonymousProducers" value="${AMQ_USE_ANONYMOUS_PRODUCERS}"/>
+    </bean>
+    <bean class="org.apache.camel.component.jms.JmsConfiguration" id="jmsConfiguration">
+        <property name="connectionFactory" ref="pooled-jms"/>
+        <property name="transacted" value="${AMQ_JMS_TRANSACTED}"/>
+        <property name="includeSentJMSMessageID" value="${AMQ_INCLUDE_SENT_JMS_MESSAGE_ID}"/>
+    </bean>
+    <bean class="org.apache.camel.component.jms.JmsComponent" id="jms">
+        <property name="configuration" ref="jmsConfiguration"/>
+    </bean>
+    <camelContext id="camel" xmlns="http://camel.apache.org/schema/spring"/>
+</beans>
